@@ -140,3 +140,29 @@ SPECTACULAR_SETTINGS = {
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,
 }
+
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'stderr': {
+            'class': 'logging.StreamHandler',
+            'level': 'ERROR',
+            'formatter': 'standard',
+            'stream': 'ext://sys.stderr'
+        }
+    },
+    'loggers': {
+        'stderr': {
+            'handlers': ['stderr'],
+            'level': 'ERROR',
+            'propagate': True
+        }
+    },
+    'formatters': {
+        'standard': {
+            'format': '%(asctime)s [%(levelname)s] %(name)s: %(message)s'
+        }
+    }
+}
