@@ -1,13 +1,20 @@
 from rest_framework.exceptions import APIException
 
-class CustomException(APIException):
+class BadRequestException(APIException):
     status_code = 400
     default_detail = 'An error occurred'
-    default_code = 'error'
 
-    def __init__(self, detail=None, code=None, metadata=None):
+    def __init__(self, detail=None):
         self.detail = detail or self.default_detail
-        self.code = code or self.default_code
-        self.metadata = metadata or {}
 
-        super().__init__(detail=self.detail, code=self.code)
+        super().__init__(detail=self.detail)
+
+
+class ServerErrorException(APIException):
+    status_code = 500
+    default_detail = 'Server error occurred'
+
+    def __init__(self, detail=None):
+        self.detail = detail or self.default_detail
+
+        super().__init__(detail=self.detail)

@@ -5,6 +5,9 @@ from drf_spectacular import openapi
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample
 from drf_spectacular.types import OpenApiTypes
 import logging
+from utils.exception_handler import BadRequestException, ServerErrorException
+from .models import Game, Ship, Captain
+from faker import Faker
 
 
 logger = logging.getLogger('stderr')
@@ -36,9 +39,24 @@ class CreateGame(generics.GenericAPIView):
         ships = request.query_params.get('ships')
         ships = ships.split(',')
         try:
-            for soldiers in ships:
-                num_of_soldiers = int(soldiers)
+            soldiers_on_ship = [int(soldiers) for soldiers in ships]
         except Exception as ex:
             logger.error(str(ex))
+            raise BadRequestException(detail='Only numbers and commas are allowed')
         
-        return response.Response('response msg', status=status.HTTP_200_OK)
+        if soldiers_on_ship is None:
+            raise BadRequestException(detail='There was a problem while getting number of soldiers')
+        else:
+            try:
+                game = Game.objects.create()
+                fake = Faker()
+                
+                for num_of_soldiers in soldiers_on_ship:
+                    ship = Ship.objects.create(soldiers=num_of_soldiers, game=game)
+                    Captain.objects.create(name=fake.name(), rank='Captain', ship=ship)
+            except Exception as ex:
+                logger.error(str(ex))
+                raise ServerErrorException(detail='Problem while creating game.')
+            
+        
+        return response.Response(f'{len(soldiers_on_ship)} ships were created in {game.name}', status=status.HTTP_200_OK)
