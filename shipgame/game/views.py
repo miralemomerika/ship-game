@@ -82,27 +82,38 @@ def attack_ship(request):
     targeted_ship = data['targeted_ship']
     game = data['game']
     
-    if game.has_ended():
+    if game.game_ended is True:
         res['details'] = game.winner()
         serialized = DetailsSerializer(res)
         return response.Response(serialized.data, status=status.HTTP_200_OK)
     
-    if attacking_ship.health == 0:
-        raise BadRequestException(detail='Attacking ship has sunk')
-    
-    if targeted_ship.health == 0:
-        raise BadRequestException(detail='The ship you were targeting is no longer a threat, as it has sunk')
-    
     if attacking_ship.game != game or targeted_ship.game != game:
-        raise BadRequestException(detail='You must select ships that are in the same game')
+        raise BadRequestException(detail='You must select ships that are in the same game you sent')
     
     if attacking_ship == targeted_ship:
         raise BadRequestException(detail='You must select different ships for battle')
     
-    attacking_ship.attack(targeted_ship)
-    targeted_ship.attack(attacking_ship)
+    if attacking_ship.has_sunk():
+        raise BadRequestException(detail='Attacking ship has sunk')
     
-    res['details'] = f'''Attacking ship health: {attacking_ship.health}. Targeted ship healt: {targeted_ship.health}'''
+    if targeted_ship.has_sunk():
+        raise BadRequestException(detail='The ship you were targeting is no longer a threat, as it has sunk')
+    
+    attacking_ship.attack(targeted_ship)
+    
+    if targeted_ship.has_sunk() is True:
+        res['details'] = f'Attacking ship health: {attacking_ship.health}. Targeted ship with id {targeted_ship.id} has sunk'
+    else:
+        targeted_ship.attack(attacking_ship)
+    
+    if attacking_ship.has_sunk() is True:
+        res['details'] = f'Attacking ship with id {attacking_ship.id} has sunk. Targeted ship health: {targeted_ship.health}'
+    
+    if attacking_ship.has_sunk() is False and targeted_ship.has_sunk() is False:
+        res['details'] = f'Attacking ship health: {attacking_ship.health}. Targeted ship health: {targeted_ship.health}'
+    
+    if game.has_ended() is True:
+        res['details'] = game.winner()
     
     serialized = DetailsSerializer(res)
     

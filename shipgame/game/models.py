@@ -90,7 +90,6 @@ class Ship(models.Model):
             damage = random.randint(10, 30)
         
         target_ship.defend(damage)
-
     
     def defend(self, attack_damage):
         critical_hit_probability = self.critical_hit_probability
@@ -105,3 +104,6 @@ class Ship(models.Model):
             self.health -= damage_taken
             
         self.save()
+    
+    def has_sunk(self):
+        return self.health == 0
