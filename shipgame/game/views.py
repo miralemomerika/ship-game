@@ -1,6 +1,6 @@
 from django.shortcuts import render
-from rest_framework import generics, status, response
-from .serializers import DetailsSerializer, AttackRequestSerializer
+from rest_framework import generics, status, response, mixins
+from .serializers import DetailsSerializer, AttackRequestSerializer, GameSerializer
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample
 from drf_spectacular.types import OpenApiTypes
 import logging
@@ -8,6 +8,8 @@ from utils.exception_handler import BadRequestException, ServerErrorException
 from .models import Game, Ship, Captain
 from faker import Faker
 from rest_framework.decorators import api_view
+from django_filters.rest_framework import DjangoFilterBackend
+from .filterset import GameFilter
 
 
 logger = logging.getLogger('stderr')
@@ -118,3 +120,19 @@ def attack_ship(request):
     serialized = DetailsSerializer(res)
     
     return response.Response(serialized.data, status=status.HTTP_200_OK)
+
+
+class GameView(generics.GenericAPIView,
+               mixins.ListModelMixin):
+    serializer_class = GameSerializer
+    filter_backends = [DjangoFilterBackend]
+    filterset_class = GameFilter
+    
+    def get_queryset(self):
+        return Game.objects.all().prefetch_related('ship_set', 'ship_set__captain')
+    
+    def get(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        queryset = self.filter_queryset(queryset)
+        serializer = self.get_serializer(queryset, many=True)
+        return response.Response(serializer.data)
