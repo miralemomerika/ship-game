@@ -46,7 +46,7 @@ def create_game(request):
         raise BadRequestException(detail='Only numbers and commas are allowed')
     
     if len(soldiers_on_ship) != len(ships):
-            raise BadRequestException(detail='Invalid value(s) for soldiers on ship.')
+        raise BadRequestException(detail='Invalid value(s) for soldiers on ship.')
     
     if soldiers_on_ship is None:
         raise BadRequestException(detail='There was a problem while getting number of soldiers')
@@ -101,12 +101,20 @@ def attack_ship(request):
     if targeted_ship.has_sunk():
         raise BadRequestException(detail='The ship you were targeting is no longer a threat, as it has sunk')
     
-    attacking_ship.attack(targeted_ship)
+    try:
+        attacking_ship.attack(targeted_ship)
+    except Exception as ex:
+        logger.error(str(ex))
+        raise ServerErrorException(detail='Error while attacking targeted ship')
     
     if targeted_ship.has_sunk() is True:
         res['details'] = f'Attacking ship health: {attacking_ship.health}. Targeted ship with id {targeted_ship.id} has sunk'
     else:
-        targeted_ship.attack(attacking_ship)
+        try:
+            targeted_ship.attack(attacking_ship)
+        except Exception as ex:
+            logger.error(str(ex))
+            raise ServerErrorException(detail='Error while attacking targeted ship')
     
     if attacking_ship.has_sunk() is True:
         res['details'] = f'Attacking ship with id {attacking_ship.id} has sunk. Targeted ship health: {targeted_ship.health}'
@@ -132,7 +140,12 @@ class GameView(generics.GenericAPIView,
         return Game.objects.all().prefetch_related('ship_set', 'ship_set__captain')
     
     def get(self, request, *args, **kwargs):
-        queryset = self.get_queryset()
-        queryset = self.filter_queryset(queryset)
-        serializer = self.get_serializer(queryset, many=True)
+        try:
+            queryset = self.get_queryset()
+            queryset = self.filter_queryset(queryset)
+            serializer = self.get_serializer(queryset, many=True)
+        except Exception as ex:
+            logger.error(str(ex))
+            raise ServerErrorException(detail='Error while getting games from database')
+        
         return response.Response(serializer.data)
