@@ -1,0 +1,7 @@
+*.o
+*.pyc
+*.class
+shipgame/logs/
+shipgame/venv/
+shipgame/*.sqlite3
+.git/
