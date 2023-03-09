@@ -24,6 +24,37 @@ class Game(models.Model):
     @property
     def name(self):
         return f'Game {self.id}'
+    
+    def winner(self):
+        """
+            Method that returns a winner of the game if there is only one ship standing.
+            If there aren't any ships there is no winner.
+            If there are multiple ships standing method returns appropriate message
+            that the game hasn't ended yet
+        """
+        ships = Ship.objects.select_related('captain').filter(health__gt=0, game=self)
+        
+        if len(ships) == 1:
+            return f'The winner of {self.name} is {ships[0].captain.name} with ship id {ships[0].id}'
+        elif len(ships) == 0:
+            return f'All ships sunk, there is no winner in {self.name}'
+        else:
+            return f'{self.name} hasn\'t ended yet'
+    
+    def has_ended(self):
+        """
+            Method that return True if the game has ended and False if there is still 
+            2 or more ships standing
+        """
+        ships = Ship.objects.filter(health__gt=0, game=self)
+        
+        if len(ships) > 1:
+            return False
+        elif len(ships) <= 1:
+            if self.game_ended is False:
+                self.game_ended = True
+                self.save()
+            return True
 
 
 class Ship(models.Model):

@@ -82,8 +82,10 @@ def attack_ship(request):
     targeted_ship = data['targeted_ship']
     game = data['game']
     
-    if game.game_ended is True:
-        raise BadRequestException(detail='This game has ended')
+    if game.has_ended():
+        res['details'] = game.winner()
+        serialized = DetailsSerializer(res)
+        return response.Response(serialized.data, status=status.HTTP_200_OK)
     
     if attacking_ship.health == 0:
         raise BadRequestException(detail='Attacking ship has sunk')
@@ -100,15 +102,7 @@ def attack_ship(request):
     attacking_ship.attack(targeted_ship)
     targeted_ship.attack(attacking_ship)
     
-    ships = Ship.objects.filter(health__gt=0, game=game)
-    
-    if len(ships) == 1:
-        ships = ships.first()
-        res['details'] = f'Winner of {game.name} is ship with id {ships.id} and size {ships.size}'
-        game.game_ended = True
-        game.save()
-    else:
-        res['details'] = f'''Attacking ship health: {attacking_ship.health}. Targeted ship healt: {targeted_ship.health}'''
+    res['details'] = f'''Attacking ship health: {attacking_ship.health}. Targeted ship healt: {targeted_ship.health}'''
     
     serialized = DetailsSerializer(res)
     
