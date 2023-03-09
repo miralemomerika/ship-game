@@ -4,10 +4,12 @@ import random
 
 
 SHIP_SIZES = {
-    'SMALL': {'hit_probability': 30, 'critical_hit_probability': 30},
-    'MEDIUM': {'hit_probability': 40, 'critical_hit_probability': 20},
-    'LARGE': {'hit_probability': 50, 'critical_hit_probability': 10}
+    'SMALL': {'hit_probability': 30, 'critical_hit_probability': 30, 'storm_resistance': 1},
+    'MEDIUM': {'hit_probability': 40, 'critical_hit_probability': 20, 'storm_resistance': 0.7},
+    'LARGE': {'hit_probability': 50, 'critical_hit_probability': 10, 'storm_resistance': 0.5}
 }
+
+STORMS = [('lightning_storm', 10), ('high_waves', 5)]
 
 
 class Captain(models.Model):
@@ -83,6 +85,10 @@ class Ship(models.Model):
     def critical_hit_probability(self):
         return SHIP_SIZES[self.size]['critical_hit_probability']
     
+    @property
+    def storm_resistance(self):
+        return SHIP_SIZES[self.size]['storm_resistance']
+    
     def attack(self, target_ship):
         hit_probability = target_ship.hit_probability
         damage = 0
@@ -98,6 +104,11 @@ class Ship(models.Model):
         if random.randint(1, 100) <= critical_hit_probability:
             damage_taken = int(attack_damage * 2)
         
+        # Generate random storm
+        if random.randint(1, 10) == 1:
+            storm = random.choice(STORMS)
+            self.storm_damage(storm=storm)
+        
         if (self.health - damage_taken) <= 0:
             self.health = 0
         else:
@@ -107,3 +118,13 @@ class Ship(models.Model):
     
     def has_sunk(self):
         return self.health == 0
+    
+    def storm_damage(self, storm):
+        ships = Ship.objects.filter(health__gt=0, game=self.game)
+            
+        new_ships = []
+        for ship in ships:
+            ship.health -= int(storm[1] * ship.storm_resistance)
+            new_ships.append(ship)
+        
+        Ship.objects.bulk_update(new_ships, ['health'])
