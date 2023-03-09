@@ -13,6 +13,7 @@ https://docs.djangoproject.com/en/4.1/ref/settings/
 from pathlib import Path
 import os
 from dotenv import load_dotenv
+from utils.json_logging_handler import JsonFormatter
 
 load_dotenv()
 
@@ -53,6 +54,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'middleware.request_logging_middleware.RequestLoggingMiddleware',
 ]
 
 ROOT_URLCONF = 'shipgame.urls'
@@ -151,18 +153,34 @@ LOGGING = {
             'level': 'ERROR',
             'formatter': 'standard',
             'stream': 'ext://sys.stderr'
-        }
+        },
+        'json': {
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': 'logs/request_logs.json',
+            'maxBytes': 10485760, # 10 MB
+            'backupCount': 2,
+            'formatter': 'json'
+        },
     },
     'loggers': {
         'stderr': {
             'handlers': ['stderr'],
             'level': 'ERROR',
             'propagate': True
-        }
+        },
+        'request': {
+            'handlers': ['json'],
+            'level': 'INFO',
+            'propagate': True,
+        },
     },
     'formatters': {
         'standard': {
             'format': '%(asctime)s [%(levelname)s] %(name)s: %(message)s'
+        },
+        'json': {
+            '()': JsonFormatter,
+            'format': '%(levelname)s %(message)s %(name)s %(asctime)s %(pathname)s %(lineno)d',
         }
     }
 }
