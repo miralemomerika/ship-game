@@ -1,62 +1,115 @@
 from django.shortcuts import render
 from rest_framework import generics, status, response
-from .serializers import GameSerializer
-from drf_spectacular import openapi
+from .serializers import DetailsSerializer, AttackRequestSerializer
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample
 from drf_spectacular.types import OpenApiTypes
 import logging
 from utils.exception_handler import BadRequestException, ServerErrorException
 from .models import Game, Ship, Captain
 from faker import Faker
+from rest_framework.decorators import api_view
 
 
 logger = logging.getLogger('stderr')
 
 
-class CreateGame(generics.GenericAPIView):
-    serializer_class = GameSerializer
+@extend_schema(
+    responses={201: DetailsSerializer},
+    parameters=[
+        OpenApiParameter(
+            name='ships',
+            type=OpenApiTypes.STR,
+            description='Number of ships to create in the game, with the number of soldiers onboard. Numbers from 1 to 100 are allowed.',
+            examples=[
+                OpenApiExample(
+                    'Example 1',
+                    summary='Create 4 ships',
+                    description='The format of this query parameter value should always be a string with numbers separated by commas. '
+                                'Every number represents one ship and the size of that number represents number of soldiers on that particular vessel. '
+                                'Feel free to put in some other values.',
+                    value='50,58,68,40'
+                )
+            ]
+        )
+    ]
+)
+@api_view(['GET'])
+def create_game(request):
+    ships = request.query_params.get('ships')
+    ships = ships.split(',')
+    try:
+        soldiers_on_ship = [int(soldiers) for soldiers in ships if 1 <= int(soldiers) <= 100]
+    except Exception as ex:
+        logger.error(str(ex))
+        raise BadRequestException(detail='Only numbers and commas are allowed')
     
-    @extend_schema(
-        parameters=[
-            OpenApiParameter(
-                name='ships',
-                type=OpenApiTypes.STR,
-                description='Number of ships to create in the game, with the number of soldiers onboard',
-                examples=[
-                    OpenApiExample(
-                        'Example 1',
-                        summary='Create 4 ships',
-                        description='The format of this query parameter value should always be a string with numbers separated by commas. '
-                                    'Every number represents one ship and the size of that number represents number of soldiers on that particular vessel. '
-                                    'Feel free to put in some other values.',
-                        value='50,58,68,40'
-                    )
-                ]
-            )
-        ]
-    )
-    def get(self, request, *args, **kwargs):
-        ships = request.query_params.get('ships')
-        ships = ships.split(',')
+    if len(soldiers_on_ship) != len(ships):
+            raise BadRequestException(detail='Invalid value(s) for soldiers on ship.')
+    
+    if soldiers_on_ship is None:
+        raise BadRequestException(detail='There was a problem while getting number of soldiers')
+    else:
         try:
-            soldiers_on_ship = [int(soldiers) for soldiers in ships]
+            game = Game.objects.create()
+            fake = Faker()
+            
+            for num_of_soldiers in soldiers_on_ship:
+                ship = Ship.objects.create(soldiers=num_of_soldiers, game=game)
+                Captain.objects.create(name=fake.name(), rank='Captain', ship=ship)
         except Exception as ex:
             logger.error(str(ex))
-            raise BadRequestException(detail='Only numbers and commas are allowed')
-        
-        if soldiers_on_ship is None:
-            raise BadRequestException(detail='There was a problem while getting number of soldiers')
-        else:
-            try:
-                game = Game.objects.create()
-                fake = Faker()
-                
-                for num_of_soldiers in soldiers_on_ship:
-                    ship = Ship.objects.create(soldiers=num_of_soldiers, game=game)
-                    Captain.objects.create(name=fake.name(), rank='Captain', ship=ship)
-            except Exception as ex:
-                logger.error(str(ex))
-                raise ServerErrorException(detail='Problem while creating game.')
-            
-        
-        return response.Response(f'{len(soldiers_on_ship)} ships were created in {game.name}', status=status.HTTP_200_OK)
+            raise ServerErrorException(detail='Problem while creating game.')
+    
+    res = {'details': f'{len(soldiers_on_ship)} ships were created in {game.name}'}
+    serialized = DetailsSerializer(res)
+    
+    return response.Response(serialized.data, status=status.HTTP_201_CREATED)
+
+
+@extend_schema(
+    request= AttackRequestSerializer,
+    responses={200: DetailsSerializer}
+)
+@api_view(['POST'])
+def attack_ship(request):
+    res = dict()
+    
+    data_serialized = AttackRequestSerializer(data=request.data)
+    data_serialized.is_valid(raise_exception=True)
+    data = data_serialized.validated_data
+    
+    attacking_ship = data['attacking_ship']
+    targeted_ship = data['targeted_ship']
+    game = data['game']
+    
+    if game.game_ended is True:
+        raise BadRequestException(detail='This game has ended')
+    
+    if attacking_ship.health == 0:
+        raise BadRequestException(detail='Attacking ship has sunk')
+    
+    if targeted_ship.health == 0:
+        raise BadRequestException(detail='The ship you were targeting is no longer a threat, as it has sunk')
+    
+    if attacking_ship.game != game or targeted_ship.game != game:
+        raise BadRequestException(detail='You must select ships that are in the same game')
+    
+    if attacking_ship == targeted_ship:
+        raise BadRequestException(detail='You must select different ships for battle')
+    
+    attacking_ship.attack(targeted_ship)
+    targeted_ship.attack(attacking_ship)
+    
+    ships = Ship.objects.filter(health__gt=0, game=game)
+    
+    if len(ships) == 1:
+        ships = ships.first()
+        res['details'] = f'Winner of {game.name} is ship with id {ships.id} and size {ships.size}'
+        game.game_ended = True
+        game.save()
+    else:
+        res['details'] = f'''Attacking ship health: {attacking_ship.health}. Targeted ship healt: {targeted_ship.health}'''
+    
+    serialized = DetailsSerializer(res)
+    
+    return response.Response(serialized.data, status=status.HTTP_200_OK)
