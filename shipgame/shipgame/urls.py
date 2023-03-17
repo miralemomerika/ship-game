@@ -3,6 +3,7 @@ from django.urls import path, include
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 from django.views.generic import TemplateView
 from .views import *
+from django_prometheus import exports
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -11,4 +12,5 @@ urlpatterns = [
     path('game/', include('game.urls')),
     path('readiness_probe', readiness_probe, name='readiness_probe'),
     path('liveness_probe', liveness_probe, name='liveness_probe'),
+    path('metrics/', exports.ExportToDjangoView, name='prometheus_metrics'),
 ]

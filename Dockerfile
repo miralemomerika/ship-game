@@ -30,4 +30,4 @@ EXPOSE 8000
 RUN python /app/manage.py migrate
 
 # Start the Django application using gunicorn
-CMD ["gunicorn", "--bind", "0.0.0.0:8000", "shipgame.wsgi:application"]
+CMD ["gunicorn", "--bind", "0.0.0.0:8000", "shipgame.wsgi:application", "--workers=4"]
